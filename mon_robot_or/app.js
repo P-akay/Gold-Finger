@@ -133,7 +133,27 @@ Return ONLY one JSON object:
       : `Ces règles ont été backtestées sur l'or (perdantes chaque année 2018-2026) et <b>jamais testées sur ${esc(m.name)}</b>. Prix : ${m.always ? 'Binance' : 'Yahoo Finance (contrats à terme / forex, avec un léger décalage)'} — peut différer de ton broker.`;
     newsState = { key: null, prePrice: null, intel: null, at: 0, busy: false, err: null };
   }
-  $('market').onchange = () => { store.set(K.market, $('market').value); applyMarket(); syncButtons(); renderHistory(); tick(); newsTick(); };
+  $('market').onchange = () => { store.set(K.market, $('market').value); applyMarket(); syncButtons(); renderHistory(); loadTV(); tick(); newsTick(); };
+
+  // ---------------------------------------------------------------- graphique TradingView (widget officiel gratuit)
+  const TV_SYMBOL = { gold: 'OANDA:XAUUSD', silver: 'OANDA:XAGUSD', oil: 'TVC:USOIL', btc: 'BITSTAMP:BTCUSD', eth: 'BITSTAMP:ETHUSD',
+    eurusd: 'FX:EURUSD', gbpusd: 'FX:GBPUSD', usdjpy: 'FX:USDJPY', nas100: 'OANDA:NAS100USD', sp500: 'OANDA:SPX500USD', us30: 'OANDA:US30USD' };
+  const TV_TF = { '5m': '5', '15m': '15', '1h': '60', '4h': '240', '1d': 'D' };
+  let tvShown = store.get('mro_tv', true), tvKey = '';
+  function loadTV(force) {
+    const box = $('tvBox');
+    box.style.display = tvShown ? '' : 'none'; $('tvToggle').textContent = tvShown ? 'Masquer' : 'Afficher';
+    const key = MK().id + '|' + tf;
+    if (!tvShown || (key === tvKey && !force)) return;
+    tvKey = key;
+    box.innerHTML = '<div class="tradingview-widget-container" style="height:100%;width:100%"><div class="tradingview-widget-container__widget" style="height:100%;width:100%"></div></div>';
+    const s = document.createElement('script');
+    s.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js'; s.async = true;
+    s.textContent = JSON.stringify({ autosize: true, symbol: TV_SYMBOL[MK().id] || 'OANDA:XAUUSD', interval: TV_TF[tf] || '15', timezone: 'Etc/UTC',
+      theme: 'dark', style: '1', locale: 'fr', allow_symbol_change: true, calendar: false, support_host: 'https://www.tradingview.com' });
+    box.firstChild.appendChild(s);
+  }
+  $('tvToggle').onclick = () => { tvShown = !tvShown; store.set('mro_tv', tvShown); loadTV(true); };
   $('pcVal').addEventListener('input', () => { $('pcVal').dataset.touched = '1'; });
 
   // ---------------------------------------------------------------- mode d'affichage (Classique / Pro)
@@ -370,7 +390,7 @@ Return ONLY one JSON object:
     $('strictBtn').classList.toggle('on', strict); $('strictBtn').textContent = strict ? '🎯 Strict' : '〰️ Souple';
     $('soundBtn').classList.toggle('on', sound); $('soundBtn').textContent = sound ? '🔊' : '🔇';
   }
-  document.querySelectorAll('#tfBtns [data-tf]').forEach(b => b.onclick = () => { tf = b.dataset.tf; store.set(K.tf, tf); syncButtons(); tick(); });
+  document.querySelectorAll('#tfBtns [data-tf]').forEach(b => b.onclick = () => { tf = b.dataset.tf; store.set(K.tf, tf); syncButtons(); loadTV(); tick(); });
   $('strictBtn').onclick = () => { strict = !strict; store.set(K.strict, strict); syncButtons(); tick(); };
   $('soundBtn').onclick = () => { sound = !sound; store.set(K.sound, sound); syncButtons(); if (sound) beep(); };
   $('clear').onclick = () => { store.set(HK(), []); store.set(QK(), {}); renderHistory(); };
@@ -554,7 +574,7 @@ Return ONLY one JSON object:
 
   // ---------------------------------------------------------------- démarrage
   try { if (window.Notification && Notification.permission === 'default') Notification.requestPermission(); } catch (e) { }
-  initChart(); applyMarket(true); applyLook(); syncButtons(); loadSettings(); renderHistory(); renderChat(); renderSessions(new Date());
+  initChart(); applyMarket(true); applyLook(); loadTV(); syncButtons(); loadSettings(); renderHistory(); renderChat(); renderSessions(new Date());
   renderWatch(); renderScanner();
   fetch('/api/ia/status').then(r => r.json()).then(st => {
     if (!st.user) return;
@@ -565,7 +585,9 @@ Return ONLY one JSON object:
   const _fetch = window.fetch;
   window.fetch = (...a) => _fetch(...a).then(r => { if (r.status === 401 && String(a[0]).startsWith('/api/') && !String(a[0]).startsWith('/api/claude')) location.href = '/login'; return r; });
   setTimeout(scanTick, 4000); setInterval(scanTick, 15e3); setInterval(renderScanner, 60e3);
-  refreshAI().then(loadNews).then(tick).then(newsTick);
+  tick();                                            // prix tout de suite, sans attendre news ni IA
+  loadNews().then(() => { tick(); newsTick(); });
+  refreshAI().then(newsTick);
   setInterval(tick, 60e3);
   setInterval(newsTick, 15e3);
   setInterval(loadNews, 5 * 60e3);

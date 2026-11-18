@@ -40,7 +40,7 @@ def fetch(url, ttl):
     now = time.time()
     if url in CACHE and now - CACHE[url][0] < ttl:
         return CACHE[url][1]
-    with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=15) as r:
+    with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=10) as r:
         data = r.read()
     CACHE[url] = (now, data)
     return data
@@ -58,8 +58,16 @@ YAHOO_TF = {"5m": ("5m", "5d"), "15m": ("15m", "5d"), "1h": ("1h", "60d"), "4h":
 
 def yahoo(symbol, tf):
     interval, rng = YAHOO_TF[tf]
-    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(symbol)}?interval={interval}&range={rng}"
-    r = json.loads(fetch(url, 20))["chart"]["result"][0]
+    err = None
+    for host in ("query1", "query2"):   # deux serveurs Yahoo : si l'un refuse (hébergeurs cloud), on essaie l'autre
+        try:
+            url = f"https://{host}.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(symbol)}?interval={interval}&range={rng}"
+            r = json.loads(fetch(url, 20))["chart"]["result"][0]
+            break
+        except Exception as e:
+            err = e
+    else:
+        raise err
     q = r["indicators"]["quote"][0]
     out = []
     for i, t in enumerate(r.get("timestamp") or []):
@@ -86,9 +94,67 @@ def candles(tf, limit, market="gold"):
     src, sym = MARKETS[market]
     if src == "yahoo":
         return yahoo(sym, "15m" if tf == "1m" else tf)[-limit:]
+    # Binance, puis secours : Coinbase (même actif), puis Yahoo (contrat à terme) pour l'or
+    err = None
+    for name, fn in (("binance", lambda: binance(sym, tf, limit)), ("coinbase", lambda: coinbase(COINBASE[market], tf, limit)),
+                     ("yahoo", lambda: yahoo(BACKUP_YAHOO[market], "15m" if tf == "1m" else tf)[-limit:])):
+        if name == "yahoo" and market not in BACKUP_YAHOO:
+            continue
+        try:
+            out = fn()
+            if out:
+                return out
+        except Exception as e:
+            err = e
+    raise err or RuntimeError("aucune source de prix")
+
+
+COINBASE = {"gold": "PAXG-USD", "btc": "BTC-USD", "eth": "ETH-USD"}
+BACKUP_YAHOO = {"gold": "GC=F", "btc": "BTC-USD", "eth": "ETH-USD"}
+
+
+def binance(sym, tf, limit):
     raw = json.loads(fetch(f"https://data-api.binance.vision/api/v3/klines?symbol={sym}&interval={tf}&limit={limit}", 20))
     return [dict(time=k[0] // 1000, open=float(k[1]), high=float(k[2]), low=float(k[3]), close=float(k[4]), volume=float(k[5]))
             for k in raw]
+
+
+def coinbase(product, tf, limit):
+    """Bougies Coinbase (max 300, de la plus récente à la plus ancienne ; pas de 4 h -> regroupement des 1 h)."""
+    g = {"1m": 60, "5m": 300, "15m": 900, "1h": 3600, "4h": 3600, "1d": 86400}[tf]
+    raw = json.loads(fetch(f"https://api.exchange.coinbase.com/products/{product}/candles?granularity={g}", 20))
+    out = [dict(time=k[0], open=float(k[3]), high=float(k[2]), low=float(k[1]), close=float(k[4]), volume=float(k[5])) for k in reversed(raw)]
+    if tf == "4h":
+        agg = []
+        for k in out:
+            b = k["time"] - k["time"] % 14400
+            if agg and agg[-1]["time"] == b:
+                a = agg[-1]; a["high"] = max(a["high"], k["high"]); a["low"] = min(a["low"], k["low"]); a["close"] = k["close"]; a["volume"] += k["volume"]
+            else:
+                agg.append(dict(k, time=b))
+        out = agg
+    return out[-limit:]
+
+
+def sante():
+    """Teste chaque source de données (sans rien de personnel) : utile pour diagnostiquer un hébergement."""
+    tests = {
+        "Binance (or PAXG)": lambda: len(binance("PAXGUSDT", "15m", 5)),
+        "Coinbase (or PAXG)": lambda: len(coinbase("PAXG-USD", "15m", 5)),
+        "Yahoo (EUR/USD)": lambda: len(yahoo("EURUSD=X", "15m")),
+        "Yahoo (Nasdaq)": lambda: len(yahoo("NQ=F", "1h")),
+        "Calendrier ForexFactory": lambda: len(calendar()),
+        "Actualités": lambda: len([n for n in news() if n.get("link")]),
+        "Dollar DXY": lambda: dxy()["price"],
+    }
+    out = {}
+    for k, fn in tests.items():
+        t = time.time()
+        try:
+            out[k] = f"ok ({fn()}) en {time.time() - t:.1f} s"
+        except Exception as e:
+            out[k] = f"ERREUR {type(e).__name__}: {str(e)[:120]} ({time.time() - t:.1f} s)"
+    return out
 
 
 def calendar():
@@ -283,7 +349,7 @@ class H(http.server.SimpleHTTPRequestHandler):
 
     def guard(self, path):
         """True si la requête peut passer ; sinon la réponse (redirection / 401) est déjà envoyée."""
-        if not comptes.USERS or path in ("/login", "/api/login") or self.session_user():
+        if not comptes.USERS or path in ("/login", "/api/login", "/api/sante") or self.session_user():
             return True
         if path.startswith("/api/"):
             self.send_json({"error": "connexion requise"}, 401)
@@ -373,6 +439,8 @@ class H(http.server.SimpleHTTPRequestHandler):
                 return self.send_json(news())
             if u.path == "/api/dxy":
                 return self.send_json(dxy())
+            if u.path == "/api/sante":
+                return self.send_json(sante())
             if u.path == "/api/ia/status":
                 return self.send_json({"serverKey": bool(server_key()), "claudeKey": bool(claude_key()), "user": self.session_user() if comptes.USERS else None})
             if u.path == "/api/claude/models":

@@ -148,6 +148,11 @@
       </div>
       <div id="chart" style="margin-top:10px"></div>
     </section>
+    <section class="card">
+      <div class="row" style="justify-content:space-between"><h2 style="margin:0">📊 TradingView</h2>
+        <button id="tvToggle" title="Afficher / masquer le graphique TradingView">Masquer</button></div>
+      <div id="tvBox" style="height:540px;margin-top:10px"></div>
+    </section>
     <section class="card pro-only"><h2>🔗 Confluence multi-unités de temps <span id="mtfCount" class="pos" style="font-size:14px"></span></h2><div class="mtf3" id="mtfBoxes"></div></section>
     <section class="card">
       <div class="row" style="justify-content:space-between"><h2 style="margin:0">🧠 Facteurs <span class="mute classic-only" id="bb"></span></h2><span class="bbn pro-only" id="bbPro"></span></div>
@@ -176,6 +181,12 @@
       <p><button id="clear">Effacer l'historique</button></p>
     </section>
     <section class="card news"><h2>Calendrier (impact fort)</h2><table id="cal"></table></section>
+    <section class="card">
+      <h2>📅 Calendrier Investing.com</h2>
+      <iframe id="invCal" title="Calendrier économique Investing.com" loading="lazy" style="width:100%;height:520px;border:0;border-radius:10px;background:#fff"
+        src="https://sslecal2.investing.com?columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&importance=3&features=datepicker,timezone&countries=5,72,4&calType=day&timeZone=15&lang=5"></iframe>
+      <p class="mute" style="font-size:12px;margin:6px 0 0">Calendrier économique en temps réel fourni par <a href="https://fr.investing.com/" target="_blank" rel="noopener">Investing.com</a> — impact fort, USA / zone euro / Royaume-Uni ; heures modifiables dans le widget.</p>
+    </section>
     <section class="card news"><h2>Actualités</h2><ul id="news"></ul></section>
   </div>
 </div></section>
