@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gold_finger</title>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+  :root { --bg:#0e1116; --card:#161b22; --line:#262d36; --txt:#e6e8eb; --mute:#8b949e; --gold:#e3b341; --up:#3fb950; --down:#f85149; --warn:#d29922; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--txt); font:14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display:flex; flex-wrap:wrap; align-items:center; gap:10px 18px; padding:12px 20px; border-bottom:1px solid var(--line); }
+  h1 { font-size:18px; margin:0; color:var(--gold); }
+  #price { font-size:22px; font-weight:700; font-variant-numeric:tabular-nums; }
+  #status { color:var(--mute); font-size:12px; margin-left:auto; }
+  nav { display:flex; gap:4px; padding:0 20px; border-bottom:1px solid var(--line); overflow-x:auto; scrollbar-width:none; }
+  nav::-webkit-scrollbar { display:none; }
+  nav button { background:none; border:0; border-bottom:2px solid transparent; border-radius:0; color:var(--mute); padding:10px 12px; white-space:nowrap; }
+  nav button.on { color:var(--txt); border-bottom-color:var(--gold); }
+  .warn { margin:12px 20px 0; padding:10px 14px; border:1px solid var(--warn); border-radius:8px; color:var(--warn); background:rgba(210,153,34,.08); font-size:13px; }
+  .tab { display:none; } .tab.on { display:block; }
+  .grid { display:grid; grid-template-columns: minmax(0,2fr) minmax(300px,1fr); gap:16px; padding:16px 20px 30px; }
+  .one { padding:16px 20px 30px; max-width:900px; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; padding:12px 16px; } .one { padding:12px 16px; } }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; }
+  .card h2 { font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--mute); margin:0 0 10px; }
+  #chart { height:420px; }
+  .col { display:flex; flex-direction:column; gap:16px; min-width:0; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  #sig, .big { font-size:26px; font-weight:800; }
+  .BUY, .STRONG_BUY { color:var(--up); } .SELL, .STRONG_SELL { color:var(--down); } .WAIT { color:var(--mute); }
+  .lv { display:grid; grid-template-columns:auto 1fr; gap:4px 14px; margin-top:10px; font-variant-numeric:tabular-nums; }
+  .lv > span:nth-child(odd) { color:var(--mute); }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+  .chip { border:1px solid var(--line); border-radius:999px; padding:2px 10px; font-size:12px; }
+  .chip.open { border-color:var(--up); color:var(--up); }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  td, th { padding:5px 4px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+  th { color:var(--mute); font-weight:500; }
+  td.n { text-align:right; font-variant-numeric:tabular-nums; }
+  .pos { color:var(--up); } .neg { color:var(--down); } .mute { color:var(--mute); }
+  a { color:var(--gold); text-decoration:none; }
+  .news ul { padding-left:18px; margin:0; max-height:300px; overflow:auto; } .news li { margin-bottom:8px; }
+  button, select, input, textarea { font:inherit; }
+  button { background:#21262d; color:var(--txt); border:1px solid var(--line); border-radius:6px; padding:6px 12px; cursor:pointer; }
+  button.on, button.primary { border-color:var(--gold); color:var(--gold); }
+  input, select, textarea { background:#0d1117; color:var(--txt); border:1px solid var(--line); border-radius:6px; padding:7px 9px; }
+  label { display:block; color:var(--mute); font-size:12px; margin:10px 0 4px; }
+  .stats { display:flex; gap:18px; margin-bottom:8px; font-variant-numeric:tabular-nums; flex-wrap:wrap; }
+  #msgs { height:420px; overflow:auto; display:flex; flex-direction:column; gap:10px; margin-bottom:10px; }
+  .msg { padding:9px 12px; border-radius:10px; max-width:85%; white-space:pre-wrap; }
+  .msg.user { align-self:flex-end; background:#1f2a37; } .msg.model { align-self:flex-start; background:#1b1f24; border:1px solid var(--line); }
+  .msg.err { color:var(--down); }
+  #chatForm { display:flex; gap:8px; } #chatIn { flex:1; }
+  #drop { border:2px dashed var(--line); border-radius:10px; padding:28px; text-align:center; color:var(--mute); cursor:pointer; }
+  #drop.over { border-color:var(--gold); }
+  #preview { max-width:100%; border-radius:8px; margin-top:10px; display:none; }
+  .ok { color:var(--up); } .ko { color:var(--down); }
+  .strat h3 { margin:14px 0 4px; font-size:15px; color:var(--gold); } .strat p { margin:0 0 6px; }
+  #lookBtn { margin-left:8px; }
+  #toasts { position:fixed; right:16px; bottom:16px; display:flex; flex-direction:column; gap:8px; z-index:50; max-width:min(520px, calc(100vw - 32px)); }
+  .toast { background:var(--card); border:1px solid var(--gold); border-radius:12px; padding:10px 12px; box-shadow:0 6px 24px rgba(0,0,0,.45); font-size:13px; display:flex; flex-wrap:wrap; gap:6px 8px; align-items:center; }
+  .toast button { padding:3px 10px; } .toast .x { margin-left:auto; }
+  .wl { display:inline-flex; gap:6px; margin:4px 14px 4px 0; color:var(--txt); font-size:14px; }
+  #scanner td, #scanner th { padding:6px 4px; } #scanner button { padding:2px 10px; font-size:12px; }
+
+  /* ===================== mode d'affichage « Pro » ===================== */
+  .pro-only { display:none; }
+  body.pro .pro-only { display:block; }
+  body.pro .classic-only { display:none; }
+  body.pro .pro-only.inl { display:inline; }
+  body.pro .bbn.pro-only { display:inline; }
+  body.pro .fbars.pro-only { display:grid; }
+  body.pro { --bg:#090b10; --card:#11141b; --line:#222733; --gold:#f5b81c; background:radial-gradient(1200px 600px at 50% -200px, #1a1608 0%, var(--bg) 60%); }
+  body.pro header { margin:16px 20px 0; border:1px solid var(--line); border-radius:16px; background:var(--card); padding:16px 22px; }
+  body.pro h1 { font-size:22px; display:flex; align-items:center; gap:10px; }
+  body.pro h1 .logo { display:inline-grid; place-items:center; width:44px; height:44px; border-radius:12px; background:linear-gradient(135deg,#f9c74f,#f39c12); font-size:22px; }
+  body.pro #price { font-size:30px; letter-spacing:.02em; }
+  body.pro #sessions { display:flex; margin:12px 20px 0; padding:10px 14px; border:1px solid var(--line); border-radius:14px; background:var(--card); width:calc(100% - 40px); }
+  body.pro nav { margin:14px 20px 0; border:1px solid var(--line); border-radius:14px; background:var(--card); padding:0 10px; }
+  body.pro nav button { padding:14px 14px; font-size:15px; }
+  body.pro nav button.on { color:var(--gold); border-bottom:3px solid var(--gold); }
+  body.pro .warn { border-radius:14px; }
+  body.pro .card { border-radius:16px; padding:18px 20px; }
+  body.pro .card h2 { text-transform:none; letter-spacing:0; font-size:17px; color:var(--txt); font-weight:700; }
+  body.pro button { border-radius:10px; }
+  body.pro #tfBtns button.on { background:var(--gold); color:#111; border-color:var(--gold); font-weight:700; }
+  body.pro .chip { border-radius:999px; padding:4px 12px; background:#171b24; }
+  .pro-sig { text-align:center; padding:6px 0 4px; }
+  .pro-sig .lbl { font-size:44px; font-weight:900; display:flex; align-items:center; justify-content:center; gap:14px; }
+  .pro-sig .ico { display:inline-grid; place-items:center; width:46px; height:46px; border-radius:10px; font-size:24px; color:#fff; }
+  .pro-sig .WAIT .ico, .pro-sig.WAIT .ico { background:#1e88e5; } .pro-sig.BUY .ico, .pro-sig.STRONG_BUY .ico { background:var(--up); } .pro-sig.SELL .ico, .pro-sig.STRONG_SELL .ico { background:var(--down); }
+  .pro-sig.WAIT .lbl { color:#f5c518; }
+  .confbar { display:flex; align-items:center; gap:12px; justify-content:center; margin:14px auto 4px; max-width:340px; }
+  .confbar .bar { flex:1; height:10px; border-radius:6px; background:#262b36; overflow:hidden; }
+  .confbar .bar i { display:block; height:100%; background:#f5c518; border-radius:6px; }
+  .confbar b { font-size:22px; color:#f5c518; }
+  .pro-box { margin-top:12px; padding:10px 14px; border-radius:12px; border:1px solid #5a4a12; background:rgba(245,184,28,.07); font-size:13px; }
+  .fbars { grid-template-columns:1fr 1fr; gap:6px 28px; }
+  @media (max-width: 700px) { .fbars { grid-template-columns:1fr; } }
+  .fb { padding:10px 0; }
+  .fb .top { display:flex; justify-content:space-between; font-weight:600; }
+  .fb .top .w { color:var(--mute); font-weight:400; }
+  .fb .track { height:6px; border-radius:4px; background:#262b36; margin:8px 0 6px; overflow:hidden; }
+  .fb .track i { display:block; height:100%; border-radius:4px; }
+  .fb .d { color:var(--mute); font-size:12px; }
+  .bbn { font-family:ui-monospace, Consolas, monospace; font-size:13px; }
+  .mtf3 { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  .mtf3 div { text-align:center; padding:12px 6px; border-radius:12px; background:#171b24; }
+  .mtf3 small { display:block; color:var(--mute); font-size:11px; }
+  .mtf3 b.HAUSSE { color:var(--up); } .mtf3 b.BAISSE { color:var(--down); } .mtf3 b.NEUTRE { color:var(--mute); }
+  .mtf3 div.HAUSSE { background:rgba(63,185,80,.12); } .mtf3 div.BAISSE { background:rgba(248,81,73,.12); }
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="logo pro-only">🥇</span><span class="classic-only">🥇</span> Gold_finger</h1>
+  <select id="market" title="Marché" style="font-weight:600"></select>
+  <div id="price">—</div>
+  <div class="chips classic-only" id="mtf"></div>
+  <div class="chips classic-only" id="sessionsC"></div>
+  <div id="status">chargement…</div>
+  <button id="logoutBtn" style="display:none" title="Se déconnecter"></button>
+  <button id="lookBtn" title="Changer l'affichage">🎨 Affichage : Classique</button>
+</header>
+<div class="chips pro-only" id="sessions"></div>
+<nav id="tabs">
+  <button data-t="live" class="on">📈 Direct</button>
+  <button data-t="chat">💬 Chat IA</button>
+  <button data-t="image">📸 Analyse de graphique</button>
+  <button data-t="tools">🧮 Outils</button>
+  <button data-t="strat">📚 Stratégies</button>
+  <button data-t="settings">⚙️ Réglages</button>
+</nav>
+<div class="warn">⚠️ <span id="warnTxt"></span> Outil d'observation, pas un conseil de trading.</div>
+
+<div class="warn" id="newsBanner" style="display:none;border-color:var(--gold);color:var(--txt)"></div>
+<section class="tab on" id="t-live"><div class="grid">
+  <div class="col">
+    <section class="card">
+      <div class="row" style="justify-content:space-between">
+        <h2 style="margin:0">Or — <span id="tfLabel">15 min</span></h2>
+        <div class="row" id="tfBtns">
+          <button data-tf="5m">5M</button><button data-tf="15m" class="on">15M</button><button data-tf="1h">1H</button><button data-tf="4h">4H</button><button data-tf="1d">1D</button>
+          <button id="strictBtn" class="on" title="Mode strict (règles complètes) ou souple (score net seulement)">🎯 Strict</button>
+          <button id="soundBtn" title="Son à chaque nouveau signal">🔊</button>
+        </div>
+      </div>
+      <div id="chart" style="margin-top:10px"></div>
+    </section>
+    <section class="card pro-only"><h2>🔗 Confluence multi-unités de temps <span id="mtfCount" class="pos" style="font-size:14px"></span></h2><div class="mtf3" id="mtfBoxes"></div></section>
+    <section class="card">
+      <div class="row" style="justify-content:space-between"><h2 style="margin:0">🧠 Facteurs <span class="mute classic-only" id="bb"></span></h2><span class="bbn pro-only" id="bbPro"></span></div>
+      <table id="factors" class="classic-only" style="margin-top:10px"></table>
+      <div class="fbars pro-only" id="factorBars" style="margin-top:10px"></div>
+    </section>
+  </div>
+  <div class="col">
+    <section class="card">
+      <h2>📡 Tous les marchés <span class="mute" style="font-size:12px;text-transform:none;letter-spacing:0">— surveillés en continu, alerte à chaque signal</span></h2>
+      <table id="scanner"></table>
+    </section>
+    <section class="card">
+      <h2>🎯 Signal <span class="pos pro-only inl" style="float:right;font-size:12px">● EN DIRECT</span></h2>
+      <div id="sig" class="WAIT classic-only">—</div>
+      <div id="proSig" class="pro-only"></div>
+      <div id="why" class="mute classic-only"></div>
+      <div class="lv" id="levels"></div>
+      <div class="chips" id="meta"></div>
+      <div id="lotHint" class="mute" style="margin-top:8px;font-size:13px"></div>
+    </section>
+    <section class="card">
+      <h2>Historique des signaux</h2>
+      <div class="stats" id="stats"></div>
+      <table id="hist"></table>
+      <p><button id="clear">Effacer l'historique</button></p>
+    </section>
+    <section class="card news"><h2>Calendrier (impact fort)</h2><table id="cal"></table></section>
+    <section class="card news"><h2>Actualités</h2><ul id="news"></ul></section>
+  </div>
+</div></section>
+
+<section class="tab" id="t-chat"><div class="one">
+  <section class="card">
+    <h2>Assistant IA</h2>
+    <div id="chatNeedKey" class="mute"></div>
+    <div id="msgs"></div>
+    <div class="chips" id="quick" style="margin-bottom:10px"></div>
+    <form id="chatForm"><input id="chatIn" placeholder="Pose ta question sur l'or…" autocomplete="off"><button class="primary">Envoyer</button></form>
+    <p class="row"><button id="chatClear">Effacer la conversation</button><span class="mute" id="chatModel"></span></p>
+  </section>
+</div></section>
+
+<section class="tab" id="t-image"><div class="one">
+  <section class="card">
+    <h2>Analyse d'une capture de graphique</h2>
+    <p class="mute">Envoie une capture : l'IA cherche la meilleure entrée (au marché, limite ou stop) avec structure, order blocks, FVG, liquidité, Fibonacci, supports/résistances et figures, puis la compare au signal du moteur en direct.</p>
+    <div id="drop">🖼️ Clique, glisse une image ici ou colle-la (Ctrl+V)<input type="file" id="file" accept="image/*" hidden></div>
+    <img id="preview" alt="capture">
+    <p class="row"><button id="analyze" class="primary" disabled>🎯 Analyser et trouver l'entrée</button><button id="imgClear">✕ Retirer</button></p>
+    <div id="imgRes"></div>
+  </section>
+</div></section>
+
+<section class="tab" id="t-tools"><div class="one">
+  <section class="card">
+    <h2>Calculateur de taille de position</h2>
+    <label>Capital ($)</label><input id="pcBal" type="number" value="10000">
+    <label>Risque par trade (%)</label><input id="pcRisk" type="number" value="1" step="0.1">
+    <label id="pcSlLbl">Distance du SL (pips)</label><input id="pcSl" type="number" value="100">
+    <label id="pcValLbl">Valeur d'un pip pour 1 lot ($)</label><input id="pcVal" type="number" value="10">
+    <p class="row"><button id="pcUse">Prendre le SL du signal actuel</button><button id="pcGo" class="primary">Calculer</button></p>
+    <div id="pcOut" class="lv"></div>
+  </section>
+</div></section>
+
+<section class="tab" id="t-strat"><div class="one"><section class="card strat">
+  <h2>Comment lire le moteur</h2>
+  <h3>Le score</h3><p>Chaque facteur (tendance des moyennes, RSI, MACD, Bollinger, Stochastique, SuperTrend, ADX, Ichimoku, VWAP, chasse de liquidité, order block, Fibonacci, figures, dollar, news) donne des points à l'achat ou à la vente. Le signal sort quand un camp domine nettement.</p>
+  <h3>Les 3 niveaux</h3><p>Niveau 0 = règles complètes (tendances 1 h et 4 h d'accord, ADX suffisant, prix pas trop étiré). Si la journée a moins de signaux que prévu (objectif 5/jour, environ un toutes les 3 h 54), le moteur passe au niveau 1 puis 2, plus permissifs. Les signaux de niveau 1-2 sont marqués d'une étoile dans l'historique.</p>
+  <h3>SL et TP</h3><p>SL = 1,25 × ATR (1,6 × la nuit en Asie). TP1 = moitié du premier objectif, TP2 = premier objectif, TP3 = deuxième objectif. Un TP1 à la moitié du SL est touché environ 2 fois sur 3 même au hasard : le pourcentage de TP1 seul ne prouve rien.</p>
+  <h3>Gestion conseillée par ce type d'outil</h3><p>Fermer une partie au TP1, mettre le SL au point d'entrée, laisser courir le reste vers TP2/TP3.</p>
+  <h3>Pauses automatiques</h3><p>Pas de signal entre 21 h et minuit UTC ni le week-end ; 45 min de pause après un SL ; pas de retournement de sens rapide.</p>
+  <h3>Mode news</h3><p>De 45 min avant à 90 min après une annonce USD à fort impact, le moteur passe en mode news. Avant : seulement les setups techniques complets (confiance ≤ 78 %), jamais dans les 3 dernières minutes. Après : l'IA (recherche Google) cherche le chiffre publié, le compare au prévu (« chaud » = mauvais pour l'or, « froid » = bon), et le signal suit ce biais si la réaction du prix (≥ 0,3 × ATR) le confirme. SL 1,4 × plus large, quota +2 ce jour-là.</p>
+  <h3>Analyse de capture (3 passes + contrôles)</h3><p>Passe 1 : l'IA lit seulement les prix (axe, dernier prix, sommets/creux). Passe 2 : elle construit le plan avec 9 grilles (structure, OB, FVG, liquidité, Fibonacci, S/R, bougies, indicateurs, timing) et 6 portes qualité. Passe 3 : un deuxième avis ; s'il n'est pas d'accord → WAIT. Puis le code vérifie : niveaux dans l'axe, côté du SL/TP, type d'ordre, vrai nombre de confluences (2 = 74 % max, 3 = 88 %, 4+ = 97 %), OB/FVG réellement présents en direct, capture périmée, cibles resserrées (TP1 ≤ 1,5 R, TP2 ≤ 2,2 R, TP3 ≤ 3,2 R), obstacles (sommets/creux 15m-1h et chiffres ronds), TP1 rapide, R:R (&lt; 0,8 → WAIT), SL vs ATR, accord avec le moteur, news.</p>
+  <h3>Ce que dit le backtest</h3><p>Sur 2018-2026 (10 574 signaux), ces règles perdent chaque année. Utilise l'outil pour observer et apprendre, pas pour suivre les signaux en réel.</p>
+</section></div></section>
+
+<section class="tab" id="t-settings"><div class="one">
+  <section class="card">
+    <h2>Réglages</h2>
+    <label>IA utilisée (chat, analyse de capture, recherche news)</label>
+    <select id="provider"><option value="gemini">Gemini (Google) — quota gratuit limité</option><option value="claude">Claude (Anthropic) — API payante à l'usage</option></select>
+    <label>IA pour la recherche internet du mode news</label>
+    <select id="searchProvider"><option value="gemini">Gemini + Google Search (gratuit dans la limite du quota)</option><option value="claude">Claude + recherche web (payant, chaque recherche facturée en plus)</option></select>
+    <p class="mute" style="font-size:13px">Chacun met <b>sa propre clé</b> ici : elle reste dans ce navigateur (jamais enregistrée sur le serveur). Le graphique, les signaux, le calendrier et les alertes marchent sans clé ; les clés servent seulement au chat, à l'analyse de capture et à la recherche news.</p>
+    <label>Clé Gemini (gratuite : aistudio.google.com → Get API key)</label>
+    <input id="key" type="password" placeholder="ta clé Gemini" style="width:100%">
+    <label>Clé Claude (payante à l'usage : platform.claude.com → API Keys — l'abonnement claude.ai ne suffit pas)</label>
+    <input id="claudeKeyIn" type="password" placeholder="ta clé Claude (sk-ant-…)" style="width:100%">
+    <div id="geminiBox"></div>
+    <label>Modèle</label>
+    <select id="model"><option value="">automatique (le plus récent disponible)</option></select>
+    <label>Marchés surveillés en arrière-plan (alerte même quand tu regardes un autre marché)</label>
+    <div id="watchList"></div>
+    <label>Confiance minimale du moteur : <b id="mcVal">70</b> %</label>
+    <input id="minConf" type="range" min="50" max="90" value="70" style="width:100%">
+    <label style="color:var(--txt);font-size:14px"><input id="selfCheck" type="checkbox" checked> Deuxième avis IA sur chaque capture (plus sûr, 1 appel de plus)</label>
+    <p class="row"><button id="save" class="primary">💾 Enregistrer</button><button id="testKey">Tester la clé</button><button id="delKey">Supprimer mes clés</button></p>
+    <div id="keyStatus"></div>
+  </section>
+</div></section>
+
+<script src="marches.js"></script>
+<script src="moteur.js"></script>
+<script src="ia.js"></script>
+<script src="analyse.js"></script>
+<script src="app.js"></script>
+<div id="toasts"></div>
+</body>
+</html>
